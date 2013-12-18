@@ -1,7 +1,9 @@
 '''Basic Minesweeper clone'''
 import pygame
+from pygame.locals import *
 import random
 import numpy
+import itertools as it
 
 BLACK    = (   0,   0,   0)
 WHITE    = ( 255, 255, 255)
@@ -12,40 +14,41 @@ L_GREY   = ( 200, 200, 200)
 L_BLUE   = ( 150, 150, 250)
 
 GRID_SIZE = 10
-T_WIDTH = 40
-T_HEIGHT = 40
+T_SIZE = 30
 MARGIN = 5 # Margin between each tile
 
 # Set the height and width of the screen dynamically based off grid size
-SCREEN_SIZE = (T_WIDTH*GRID_SIZE + MARGIN*(GRID_SIZE+1),
-                T_HEIGHT*GRID_SIZE + MARGIN*(GRID_SIZE+1))
+SCREEN_SIZE = (T_SIZE*GRID_SIZE + MARGIN*(GRID_SIZE+1),
+                T_SIZE*GRID_SIZE + MARGIN*(GRID_SIZE+1))
 CENTER = (SCREEN_SIZE[0]//2, SCREEN_SIZE[1]//2)
 screen = pygame.display.set_mode(SCREEN_SIZE)
 pygame.display.set_caption("YoursSweeper")
 
 FLAG_IMAGE = pygame.image.load('flag.png').convert_alpha()
+FLAG_IMAGE = pygame.transform.scale(FLAG_IMAGE, (T_SIZE, T_SIZE))
 MINE_IMAGE = pygame.image.load('mine.png').convert_alpha()
+MINE_IMAGE = pygame.transform.scale(MINE_IMAGE, (T_SIZE, T_SIZE))
 
-def init_visible_grid():
+def init_visible_grid(grid_size=10):
     '''Initialize grid representing matrix visible to player'''
     visible_grid = []
-    for row in range(GRID_SIZE):
-        visible_grid.append([-2 for i in range(GRID_SIZE)])
+    for row in range(grid_size):
+        visible_grid.append([-2 for i in range(grid_size)])
     return visible_grid
 
-def init_grid(mine_count=10):
+def init_grid(grid_size=10, mine_count=10):
     '''Initialize mine grid. Reset board and place new mines randomly'''
     grid = []
-    for row in range(GRID_SIZE):
-        grid.append([0 for i in range(GRID_SIZE)])
+    for row in range(grid_size):
+        grid.append([0 for i in range(grid_size)])
     
     # Place mines randomly
-    mine_locs = random.sample(xrange(pow(GRID_SIZE, 2)), mine_count)
+    mine_locs = random.sample(xrange(pow(grid_size, 2)), mine_count)
     for mine_loc in mine_locs:
-        grid[mine_loc//GRID_SIZE][mine_loc%GRID_SIZE] = -1
+        grid[mine_loc//grid_size][mine_loc%grid_size] = -1
     
     # Set all non-mine cell's value to the number of adjacent mines
-    for r, c in numpy.ndindex((GRID_SIZE, GRID_SIZE)):
+    for r, c in numpy.ndindex((grid_size, grid_size)):
         if grid[r][c] != -1:
             grid[r][c] = count_surrounding_mines(grid, r, c)
 
@@ -65,13 +68,14 @@ def draw_visible_grid(visible_grid):
        -1: a mine that has been clicked
        -4: a flag placed by the player on an unclicked tile
         0: a clicked tile with no adjacent mines'''
-    font = pygame.font.Font(None, T_HEIGHT)
+    font = pygame.font.Font(None, T_SIZE)
+    # TODO: remove GRID_SIZE dependency
     for r, c in numpy.ndindex((GRID_SIZE, GRID_SIZE)):
         color_dict = {-2: L_GREY, -1: RED, 0: GREY, -4: L_GREY}
         color = color_dict.get(visible_grid[r][c], WHITE)
 
         pygame.draw.rect(screen, color,
-            [get_tl_xy_coords(r, c), (T_WIDTH, T_HEIGHT)])
+            [get_tl_xy_coords(r, c), (T_SIZE, T_SIZE)])
 
         if visible_grid[r][c] == -4:
             flag_rect = FLAG_IMAGE.get_rect()
@@ -84,102 +88,134 @@ def draw_visible_grid(visible_grid):
             screen.blit(MINE_IMAGE, mine_rect)
 
         elif visible_grid[r][c] > 0:
-            value_text = font.render(str(grid[r][c]), True, RED)
+            value_text = font.render(str(visible_grid[r][c]), True, RED)
             value_rect = value_text.get_rect()
             value_rect.center = get_center_xy_coords(r, c)
             screen.blit(value_text, value_rect)
 
-def reveal_square(row, col):
-    '''Uncover value of cell. If the cell has 0 adjacent mines, uncover
-       the values of all adjacent cells'''
-    if visible_grid[row][col] == -4: return False
-
-    if grid[row][col] == 0:
-        visible_grid[row][col] = 0
-        for r in range(row-1, row+2):
-            for c in range(col-1, col+2):
-                if (0 <= r < GRID_SIZE and 0 <= c < GRID_SIZE and 
-                    visible_grid[r][c] <= -2):
-                    reveal_square(r, c)
-    else:
-        visible_grid[row][col] = grid[row][col]
-        return grid[row][col] == -1
-
-def game_won(visible_grid):
-    uncovered_tiles = 0
-    for r, c in numpy.ndindex((GRID_SIZE, GRID_SIZE)):
-        if visible_grid[r][c] >= 0:
-            uncovered_tiles += 1
-
-    return pow(GRID_SIZE, 2) - uncovered_tiles == MINE_COUNT
-
 def get_grid_coords(x, y):
     '''Convert screen x/y coordinates to grid coordinates: row/col'''
-    return y // (T_HEIGHT + MARGIN), x // (T_WIDTH + MARGIN)
+    return y // (T_SIZE + MARGIN), x // (T_SIZE + MARGIN)
 
 def get_tl_xy_coords(row, col):
     '''Convert grid coordinates to x/y coordinates. Top left of tile'''
-    return ((MARGIN+T_WIDTH)*col+MARGIN, (MARGIN+T_HEIGHT)*row+MARGIN)
+    return ((MARGIN+T_SIZE)*col+MARGIN, (MARGIN+T_SIZE)*row+MARGIN)
 
 def get_center_xy_coords(row, col):
     '''Convert grid coordinates to x/y coordinates. Center of tile'''
-    return ((MARGIN+T_WIDTH)*col+MARGIN + T_WIDTH/2, 
-            (MARGIN+T_HEIGHT)*row+MARGIN + T_HEIGHT/2)
+    return ((MARGIN+T_SIZE)*col+MARGIN + T_SIZE/2, 
+            (MARGIN+T_SIZE)*row+MARGIN + T_SIZE/2)
 
 
-pygame.init()
-hit_mine = False
-done = False
-grid = init_grid()
-visible_grid = init_visible_grid()
-GRID_SIZE = 10
-MINE_COUNT = 10
-# ---- MAIN PROGRAM LOOP ----
-while not done:
-    # Event Handling
-    for event in pygame.event.get():
-        if event.type == pygame.QUIT:
-            done = True
-        if hit_mine or game_won(visible_grid):
-            if event.type == pygame.KEYDOWN and event.key == pygame.K_SPACE:
-                grid = init_grid()
-                visible_grid = init_visible_grid()
-                hit_mine = False
+
+class Game(object):
+    def __init__(self, grid_size=10, mine_amt=10):
+        self.reset(grid_size, mine_amt)
+
+    def reset(self, grid_size, mine_amt):
+        self.grid_size = grid_size
+        self.mine_amt = mine_amt
+        self.grid = init_grid(self.grid_size, self.mine_amt)
+        self.visible_grid = init_visible_grid(self.grid_size)
+
+        self.ticks = 0
+        self.hit_mine = False
+        self.done = False
+
+    def game_won(self):
+        uncovered_tiles = 0
+        for r, c in numpy.ndindex((self.grid_size, self.grid_size)):
+            if self.visible_grid[r][c] >= 0:
+                uncovered_tiles += 1
+
+        return pow(self.grid_size, 2) - uncovered_tiles == self.mine_amt
+
+    def get_hit_mine(self):
+        return self.hit_mine
+
+    def reveal_square(self, row, col):
+        '''Uncover value of cell. If the cell has 0 adjacent mines, uncover
+           the values of all adjacent cells'''
+        if self.grid[row][col] == 0:
+            self.visible_grid[row][col] = 0
+            for r, c in it.product(range(row-1, row+2), range(col-1, col+2)):
+                if (0 <= r < self.grid_size and 0 <= c < self.grid_size and
+                    self.visible_grid[r][c] <= -2):
+                    self.reveal_square(r, c)
         else:
-            if event.type == pygame.MOUSEBUTTONDOWN:
-                pos = pygame.mouse.get_pos()
-                hit_mine = reveal_square(*get_grid_coords(*pos))
-            elif event.type == pygame.KEYDOWN and event.key == pygame.K_SPACE:
-                pos = pygame.mouse.get_pos()
-                row, col = get_grid_coords(*pos)
+            if self.visible_grid[row][col] == -4: return False
 
-                # Set/unset flag
-                if col < GRID_SIZE and row < GRID_SIZE:
-                    if visible_grid[row][col] == -2:
-                            visible_grid[row][col] = -4
-                    elif visible_grid[row][col] == -4:
-                            visible_grid[row][col] = -2
+            self.visible_grid[row][col] = self.grid[row][col]
+            return self.visible_grid[row][col] == -1
 
-    # Displaying board
-    screen.fill(BLACK)
-    draw_visible_grid(visible_grid)
 
-    if hit_mine or game_won(visible_grid):
-        font = pygame.font.Font(None, 60)
-        if hit_mine:
-            end_game_text = font.render('Game over!', True, L_BLUE, BLACK) 
-        else:
-            end_game_text = font.render('You won!', True, L_BLUE, BLACK)
-        end_game_rect = end_game_text.get_rect()
-        end_game_rect.center = CENTER
-        screen.blit(end_game_text, end_game_rect)
+    def process_events(self):
+        for event in pygame.event.get():
+            if event.type == QUIT:
+                return True
+            if self.hit_mine or self.game_won():
+                if event.type == KEYDOWN and event.key == K_SPACE:
+                    self.reset(self.grid_size, self.mine_amt)
+            else:
+                if event.type == MOUSEBUTTONDOWN:
+                    pos = pygame.mouse.get_pos()
+                    self.hit_mine = self.reveal_square(*get_grid_coords(*pos))
+                elif event.type == KEYDOWN and event.key == K_SPACE:
+                    pos = pygame.mouse.get_pos()
+                    row, col = get_grid_coords(*pos)
 
-        continue_text = font.render('Hit space to play again', True, 
-            L_BLUE, BLACK)
-        continue_rect = continue_text.get_rect()
-        continue_rect.center = (CENTER[0], CENTER[1] + 40)
-        screen.blit(continue_text, continue_rect)
+                    # Set/unset flag
+                    if col < self.grid_size and row < self.grid_size:
+                        if self.visible_grid[row][col] == -2:
+                                self.visible_grid[row][col] = -4
+                        elif self.visible_grid[row][col] == -4:
+                                self.visible_grid[row][col] = -2
 
-    pygame.display.flip()
+    def run_logic(self):
+        self.ticks += 1
 
-pygame.quit()
+    def display_frame(self):
+        screen.fill(BLACK)
+        draw_visible_grid(self.visible_grid)
+
+        if self.hit_mine or self.game_won():
+            draw_visible_grid(self.grid)
+            font = pygame.font.Font(None, T_SIZE*2)
+            if self.hit_mine:
+                end_game_text = font.render('Game over!', True, L_BLUE, BLACK) 
+            else:
+                end_game_text = font.render('You won!', True, L_BLUE, BLACK)
+            end_game_rect = end_game_text.get_rect()
+            end_game_rect.center = CENTER
+            screen.blit(end_game_text, end_game_rect)
+
+            font = pygame.font.Font(None, T_SIZE)
+            continue_text = font.render('Hit space to play again', True, 
+                L_BLUE, BLACK)
+            continue_rect = continue_text.get_rect()
+            continue_rect.center = (CENTER[0], CENTER[1] + T_SIZE)
+            screen.blit(continue_text, continue_rect)
+
+        pygame.display.flip()
+
+
+def main():
+    pygame.init()
+    done = False
+    clock = pygame.time.Clock()
+    game = Game()
+
+    while not done:
+        done = game.process_events()
+
+        if not game.get_hit_mine():
+            game.run_logic()
+
+        game.display_frame()
+
+        clock.tick(10)
+
+    pygame.quit()
+
+if __name__ == '__main__':
+    main()

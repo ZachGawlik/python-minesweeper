@@ -2,7 +2,6 @@
 import pygame
 from pygame.locals import *
 import random
-import numpy
 import itertools as it
 
 BLACK    = (   0,   0,   0)
@@ -13,6 +12,7 @@ GREY     = ( 100, 100, 100)
 L_GREY   = ( 200, 200, 200)
 L_BLUE   = ( 150, 150, 250)
 
+# TODO: remove GRID_SIZE dependency
 GRID_SIZE = 10
 T_SIZE = 30
 MARGIN = 5 # Margin between each tile
@@ -37,7 +37,9 @@ def init_visible_grid(grid_size=10):
     return visible_grid
 
 def init_grid(grid_size=10, mine_count=10):
-    '''Initialize mine grid. Reset board and place new mines randomly'''
+    '''Initialize mine grid. Reset board and place new mines randomly
+       -1: represents a mine
+       0-8: represents number of miens adjacent to this cell'''
     grid = []
     for row in range(grid_size):
         grid.append([0 for i in range(grid_size)])
@@ -48,7 +50,7 @@ def init_grid(grid_size=10, mine_count=10):
         grid[mine_loc//grid_size][mine_loc%grid_size] = -1
     
     # Set all non-mine cell's value to the number of adjacent mines
-    for r, c in numpy.ndindex((grid_size, grid_size)):
+    for r, c in it.product(range(grid_size), repeat=2):
         if grid[r][c] != -1:
             grid[r][c] = count_surrounding_mines(grid, r, c)
 
@@ -58,7 +60,7 @@ def count_surrounding_mines(grid, row, col):
     count = 0
     for r in range(row-1, row+2):
         for c in range(col-1, col+2):
-            if 0 <= r < GRID_SIZE and 0 <= c < GRID_SIZE:
+            if 0 <= r < len(grid) and 0 <= c < len(grid[0]):
                 count = count + 1 if grid[r][c] == -1 else count
     return count
 
@@ -69,8 +71,7 @@ def draw_visible_grid(visible_grid):
        -4: a flag placed by the player on an unclicked tile
         0: a clicked tile with no adjacent mines'''
     font = pygame.font.Font(None, T_SIZE)
-    # TODO: remove GRID_SIZE dependency
-    for r, c in numpy.ndindex((GRID_SIZE, GRID_SIZE)):
+    for r, c in it.product(range(len(visible_grid)), repeat=2):
         color_dict = {-2: L_GREY, -1: RED, 0: GREY, -4: L_GREY}
         color = color_dict.get(visible_grid[r][c], WHITE)
 
@@ -122,16 +123,25 @@ class Game(object):
         self.hit_mine = False
         self.done = False
 
-    def game_won(self):
+    def all_clicked(self):
         uncovered_tiles = 0
-        for r, c in numpy.ndindex((self.grid_size, self.grid_size)):
+        for r, c in it.product(range(self.grid_size), repeat=2):
             if self.visible_grid[r][c] >= 0:
                 uncovered_tiles += 1
 
         return pow(self.grid_size, 2) - uncovered_tiles == self.mine_amt
 
-    def get_hit_mine(self):
-        return self.hit_mine
+    def all_mines_flagged(self):
+        '''Check for win by flagging all mines correctly and no other tiles'''
+        for r, c in it.product(range(self.grid_size), repeat=2):
+            if (self.grid[r][c] == -1 and self.visible_grid[r][c] != -4 or
+                self.visible_grid[r][c] == -4 and self.grid[r][c] != -1):
+                return False
+        return True
+
+    def game_won(self):
+        '''Determine if current game has been won'''
+        return self.all_clicked() or self.all_mines_flagged()
 
     def reveal_square(self, row, col):
         '''Uncover value of cell. If the cell has 0 adjacent mines, uncover
@@ -172,7 +182,8 @@ class Game(object):
                                 self.visible_grid[row][col] = -2
 
     def run_logic(self):
-        self.ticks += 1
+        if not self.hit_mine and not self.game_won():
+            self.ticks += 1
 
     def display_frame(self):
         screen.fill(BLACK)
@@ -184,7 +195,8 @@ class Game(object):
             if self.hit_mine:
                 end_game_text = font.render('Game over!', True, L_BLUE, BLACK) 
             else:
-                end_game_text = font.render('You won!', True, L_BLUE, BLACK)
+                end_game_text = font.render('You won!' + str(self.ticks), 
+                    True, L_BLUE, BLACK)
             end_game_rect = end_game_text.get_rect()
             end_game_rect.center = CENTER
             screen.blit(end_game_text, end_game_rect)
@@ -207,15 +219,12 @@ def main():
 
     while not done:
         done = game.process_events()
-
-        if not game.get_hit_mine():
-            game.run_logic()
-
+        game.run_logic()
         game.display_frame()
-
         clock.tick(10)
 
     pygame.quit()
+
 
 if __name__ == '__main__':
     main()

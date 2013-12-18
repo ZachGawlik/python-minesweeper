@@ -12,22 +12,38 @@ GREY     = ( 100, 100, 100)
 L_GREY   = ( 200, 200, 200)
 L_BLUE   = ( 150, 150, 250)
 
-# TODO: remove GRID_SIZE dependency
-GRID_SIZE = 10
 T_SIZE = 30
 MARGIN = 5 # Margin between each tile
 
-# Set the height and width of the screen dynamically based off grid size
-SCREEN_SIZE = (T_SIZE*GRID_SIZE + MARGIN*(GRID_SIZE+1),
-                T_SIZE*GRID_SIZE + MARGIN*(GRID_SIZE+1))
-CENTER = (SCREEN_SIZE[0]//2, SCREEN_SIZE[1]//2)
-screen = pygame.display.set_mode(SCREEN_SIZE)
+screen = pygame.display.set_mode((285, 315))
 pygame.display.set_caption("YoursSweeper")
 
-FLAG_IMAGE = pygame.image.load('flag.png').convert_alpha()
-FLAG_IMAGE = pygame.transform.scale(FLAG_IMAGE, (T_SIZE, T_SIZE))
-MINE_IMAGE = pygame.image.load('mine.png').convert_alpha()
-MINE_IMAGE = pygame.transform.scale(MINE_IMAGE, (T_SIZE, T_SIZE))
+def opening_click_button(mouse_pos):
+    '''Handle clicks during opening screen'''
+    if 80 <= mouse_pos[0] <= 200:
+        if 178 <= mouse_pos[1] < 210:
+            return Game(8, 10)
+        elif 210 <= mouse_pos[1] < 244:
+            return Game(16, 40)
+        elif 244 <= mouse_pos[1] <= 276:
+            return Game(21, 99)
+    
+    return False
+
+def opening_screen():
+    '''Display opening screen. Return a game instance or False if quitting'''
+    opening_img = pygame.image.load('openingscreen.png')
+    screen.blit(opening_img, (0, 0))
+    pygame.display.flip()
+
+    while True:
+        for event in pygame.event.get(): # User did something
+            if event.type == pygame.QUIT: # If user clicked close
+                return False # Flag that we are done so we exit this loop
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                mouse_pos = pygame.mouse.get_pos()
+                if opening_click_button(mouse_pos):
+                    return opening_click_button(mouse_pos)
 
 def init_visible_grid(grid_size=10):
     '''Initialize grid representing matrix visible to player'''
@@ -36,7 +52,7 @@ def init_visible_grid(grid_size=10):
         visible_grid.append([-2 for i in range(grid_size)])
     return visible_grid
 
-def init_grid(grid_size=10, mine_count=10):
+def init_grid(grid_size, mine_count):
     '''Initialize mine grid. Reset board and place new mines randomly
        -1: represents a mine
        0-8: represents number of miens adjacent to this cell'''
@@ -64,7 +80,33 @@ def count_surrounding_mines(grid, row, col):
                 count = count + 1 if grid[r][c] == -1 else count
     return count
 
-def draw_visible_grid(visible_grid):
+def count_flags(visible_grid):
+    '''Count flags placed by user. Use for player's remaining mine count'''
+    total_flags = 0
+    for r, c in it.product(range(len(visible_grid)), repeat=2):
+        if visible_grid[r][c] == -4:
+            total_flags += 1
+    return total_flags
+
+def draw_buttons(screen):
+    '''Draw the buttons for beg, med, hard difficulties'''
+    font = pygame.font.Font(None, T_SIZE)
+    beg_text = font.render('BEG.', True, BLACK, L_GREY)
+    beg_rect = beg_text.get_rect()
+    beg_rect.midleft = (0, screen.get_height() - T_SIZE/2)
+    screen.blit(beg_text, beg_rect)
+
+    med_text = font.render('MED.', True, BLACK, L_GREY)
+    med_rect = med_text.get_rect()
+    med_rect.midleft = (75, screen.get_height() - T_SIZE/2)
+    screen.blit(med_text, med_rect)
+
+    hard_text = font.render('HARD', True, BLACK, L_GREY)
+    hard_rect = hard_text.get_rect()
+    hard_rect.midleft = (150, screen.get_height() - T_SIZE/2)
+    screen.blit(hard_text, hard_rect)
+
+def draw_grid(visible_grid, screen, flag_img, mine_img):
     '''Draw the grid representation of what is shown to the player.
        -2: a covered tile, unclicked.
        -1: a mine that has been clicked
@@ -79,14 +121,14 @@ def draw_visible_grid(visible_grid):
             [get_tl_xy_coords(r, c), (T_SIZE, T_SIZE)])
 
         if visible_grid[r][c] == -4:
-            flag_rect = FLAG_IMAGE.get_rect()
+            flag_rect = flag_img.get_rect()
             flag_rect.center = get_center_xy_coords(r, c)
-            screen.blit(FLAG_IMAGE, flag_rect)
+            screen.blit(flag_img, flag_rect)
 
         elif visible_grid[r][c] == -1:
-            mine_rect = MINE_IMAGE.get_rect()
+            mine_rect = mine_img.get_rect()
             mine_rect.center = get_center_xy_coords(r, c)
-            screen.blit(MINE_IMAGE, mine_rect)
+            screen.blit(mine_img, mine_rect)
 
         elif visible_grid[r][c] > 0:
             value_text = font.render(str(visible_grid[r][c]), True, RED)
@@ -108,12 +150,25 @@ def get_center_xy_coords(row, col):
             (MARGIN+T_SIZE)*row+MARGIN + T_SIZE/2)
 
 
-
 class Game(object):
     def __init__(self, grid_size=10, mine_amt=10):
         self.reset(grid_size, mine_amt)
 
     def reset(self, grid_size, mine_amt):
+        self.grid_screen_size = (T_SIZE*grid_size + MARGIN*(grid_size+1),
+                T_SIZE*grid_size + MARGIN*(grid_size+1))
+        self.center = (self.grid_screen_size[0]//2, 
+                        self.grid_screen_size[1]//2)
+        self.total_screen_size = (self.grid_screen_size[0], 
+            self.grid_screen_size[1] + T_SIZE)
+
+        self.screen = pygame.display.set_mode(self.total_screen_size)
+
+        flag_img = pygame.image.load('flag.png').convert_alpha()
+        self.flag_img = pygame.transform.scale(flag_img, (T_SIZE, T_SIZE))
+        mine_img = pygame.image.load('mine.png').convert_alpha()
+        self.mine_img = pygame.transform.scale(mine_img, (T_SIZE, T_SIZE))
+
         self.grid_size = grid_size
         self.mine_amt = mine_amt
         self.grid = init_grid(self.grid_size, self.mine_amt)
@@ -146,6 +201,8 @@ class Game(object):
     def reveal_square(self, row, col):
         '''Uncover value of cell. If the cell has 0 adjacent mines, uncover
            the values of all adjacent cells'''
+        if not (col < self.grid_size and row < self.grid_size): return False
+
         if self.grid[row][col] == 0:
             self.visible_grid[row][col] = 0
             for r, c in it.product(range(row-1, row+2), range(col-1, col+2)):
@@ -158,6 +215,15 @@ class Game(object):
             self.visible_grid[row][col] = self.grid[row][col]
             return self.visible_grid[row][col] == -1
 
+    def click_button(self, mouse_pos):
+        if mouse_pos[1] >= self.grid_screen_size[1]:
+            if 0 <= mouse_pos[0] <= 50:
+                self.reset(8, 10)
+            elif 75 <= mouse_pos[0] <= 125:
+                self.reset(16, 40)
+            elif 150 <= mouse_pos[0] <= 200:
+                self.reset(21, 99)
+
 
     def process_events(self):
         for event in pygame.event.get():
@@ -166,7 +232,10 @@ class Game(object):
             if self.hit_mine or self.game_won():
                 if event.type == KEYDOWN and event.key == K_SPACE:
                     self.reset(self.grid_size, self.mine_amt)
-            else:
+                if event.type == MOUSEBUTTONDOWN:
+                    pos = pygame.mouse.get_pos()
+                    self.click_button(pos)
+            else: 
                 if event.type == MOUSEBUTTONDOWN:
                     pos = pygame.mouse.get_pos()
                     self.hit_mine = self.reveal_square(*get_grid_coords(*pos))
@@ -186,27 +255,42 @@ class Game(object):
             self.ticks += 1
 
     def display_frame(self):
-        screen.fill(BLACK)
-        draw_visible_grid(self.visible_grid)
+        self.screen.fill(BLACK)
+        draw_buttons(self.screen)
+        draw_grid(self.visible_grid, self.screen, self.flag_img, self.mine_img)
+
+        font = pygame.font.Font(None, T_SIZE)
+        points_text = font.render(str(self.ticks//10), True, L_BLUE)
+        points_rect = points_text.get_rect()
+        points_rect.bottomright = self.total_screen_size
+        self.screen.blit(points_text, points_rect)
+
+        mines_text = font.render(
+            str(self.mine_amt - count_flags(self.visible_grid)), True, RED)
+        mines_rect = mines_text.get_rect()
+        mines_rect.right = points_rect.left - 10
+        mines_rect.bottom = points_rect.bottom
+        self.screen.blit(mines_text, mines_rect)
+
 
         if self.hit_mine or self.game_won():
-            draw_visible_grid(self.grid)
+            draw_grid(self.grid, self.screen, self.flag_img, self.mine_img)
+
             font = pygame.font.Font(None, T_SIZE*2)
             if self.hit_mine:
                 end_game_text = font.render('Game over!', True, L_BLUE, BLACK) 
             else:
-                end_game_text = font.render('You won!' + str(self.ticks), 
-                    True, L_BLUE, BLACK)
+                end_game_text = font.render('You won!', True, L_BLUE, BLACK)
             end_game_rect = end_game_text.get_rect()
-            end_game_rect.center = CENTER
-            screen.blit(end_game_text, end_game_rect)
+            end_game_rect.center = self.center
+            self.screen.blit(end_game_text, end_game_rect)
 
             font = pygame.font.Font(None, T_SIZE)
             continue_text = font.render('Hit space to play again', True, 
                 L_BLUE, BLACK)
             continue_rect = continue_text.get_rect()
-            continue_rect.center = (CENTER[0], CENTER[1] + T_SIZE)
-            screen.blit(continue_text, continue_rect)
+            continue_rect.center = (self.center[0], self.center[1] + T_SIZE)
+            self.screen.blit(continue_text, continue_rect)
 
         pygame.display.flip()
 
@@ -215,9 +299,8 @@ def main():
     pygame.init()
     done = False
     clock = pygame.time.Clock()
-    game = Game()
-
-    while not done:
+    game = opening_screen()
+    while game and not done:
         done = game.process_events()
         game.run_logic()
         game.display_frame()

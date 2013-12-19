@@ -5,6 +5,7 @@ import random
 import itertools as it
 import numpy as np
 
+
 BLACK    = (   0,   0,   0)
 WHITE    = ( 255, 255, 255)
 RED      = ( 255,   0,   0)
@@ -18,6 +19,7 @@ MARGIN = 5 # Margin between each tile
 
 pygame.font.init()
 T_FONT = pygame.font.Font(None, T_SIZE)
+T2_FONT = pygame.font.Font(None, T_SIZE*2)
 
 
 def opening_click_button(mouse_pos):
@@ -32,10 +34,12 @@ def opening_click_button(mouse_pos):
     
     return False
 
-def opening_screen():
+
+def opening_screen(screen):
     '''Display opening screen. Return a game instance or False if quitting'''
     opening_img = pygame.image.load('openingscreen.png')
-    scaled_opening_img = pygame.transform.scale(opening_img, EASY.total_screen_size)
+    scaled_opening_img = pygame.transform.scale(opening_img, 
+                                                EASY.total_screen_size)
     screen.blit(scaled_opening_img, (0, 0))
     pygame.display.flip()
 
@@ -48,9 +52,11 @@ def opening_screen():
                 if opening_click_button(mouse_pos):
                     return opening_click_button(mouse_pos)
 
+
 def grid_ndindex(grid):
     '''Generate all indices for a nonempty 2d array'''
     return np.ndindex(len(grid), len(grid[0]))
+
 
 def init_visible_grid(grid_size):
     '''Initialize grid representing matrix visible to player'''
@@ -58,6 +64,7 @@ def init_visible_grid(grid_size):
     for row in range(grid_size[0]):
         visible_grid.append([-2 for c in range(grid_size[1])])
     return visible_grid
+
 
 def init_grid(grid_size, mine_count):
     '''Initialize mine grid. Reset board and place new mines randomly
@@ -79,6 +86,7 @@ def init_grid(grid_size, mine_count):
 
     return grid
 
+
 def count_adjacent_mines(grid, row, col):
     count = 0
     for r in range(row-1, row+2):
@@ -87,6 +95,7 @@ def count_adjacent_mines(grid, row, col):
                 count = count + 1 if grid[r][c] == -1 else count
     return count
 
+
 def count_flags(visible_grid):
     '''Count flags placed by user. Use for player's remaining mine count'''
     total_flags = 0
@@ -94,6 +103,7 @@ def count_flags(visible_grid):
         if visible_grid[r][c] == -4:
             total_flags += 1
     return total_flags
+
 
 def draw_buttons(screen):
     '''Draw the buttons for beginner, medium, hard difficulties'''
@@ -112,6 +122,7 @@ def draw_buttons(screen):
     hard_rect.midleft = (150, screen.get_height() - T_SIZE/2)
     screen.blit(hard_text, hard_rect)
 
+
 def draw_grid(visible_grid, screen):
     '''Draw the grid representation of what is shown to the player.
        -2: a covered tile, unclicked.
@@ -126,7 +137,7 @@ def draw_grid(visible_grid, screen):
         color = color_dict.get(visible_grid[r][c], WHITE)
 
         pygame.draw.rect(screen, color,
-            [get_tl_xy_coords(r, c), (T_SIZE, T_SIZE)])
+                         [get_tl_xy_coords(r, c), (T_SIZE, T_SIZE)])
 
         if visible_grid[r][c] == -4:
             flag_rect = scaled_flag_img.get_rect()
@@ -144,13 +155,16 @@ def draw_grid(visible_grid, screen):
             value_rect.center = get_center_xy_coords(r, c)
             screen.blit(value_text, value_rect)
 
+
 def get_grid_coords(x, y):
     '''Convert screen x/y coordinates to grid coordinates: row/col'''
     return y // (T_SIZE + MARGIN), x // (T_SIZE + MARGIN)
 
+
 def get_tl_xy_coords(row, col):
     '''Convert grid coordinates to x/y coordinates. Top left of tile'''
     return ((MARGIN+T_SIZE)*col+MARGIN, (MARGIN+T_SIZE)*row+MARGIN)
+
 
 def get_center_xy_coords(row, col):
     '''Convert grid coordinates to x/y coordinates. Center of tile'''
@@ -163,12 +177,14 @@ class Game(object):
         self.reset(grid_size, mine_amt)
 
     def reset(self, grid_size, mine_amt):
-        self.grid_screen_size = (T_SIZE*grid_size[0] + MARGIN*(grid_size[0]+1),
-                T_SIZE*grid_size[1] + MARGIN*(grid_size[1]+1))
+        self.grid_screen_size = (
+            T_SIZE*grid_size[0] + MARGIN*(grid_size[0]+1),
+            T_SIZE*grid_size[1] + MARGIN*(grid_size[1]+1)
+        )
         self.center = (self.grid_screen_size[1]//2, 
-                        self.grid_screen_size[0]//2)
+                       self.grid_screen_size[0]//2)
         self.total_screen_size = (self.grid_screen_size[1], 
-                                    self.grid_screen_size[0] + T_SIZE)
+                                  self.grid_screen_size[0] + T_SIZE)
 
         self.screen = pygame.display.set_mode(self.total_screen_size)
 
@@ -254,9 +270,11 @@ class Game(object):
                         elif self.visible_grid[row][col] == -4:
                                 self.visible_grid[row][col] = -2
 
+
     def run_logic(self):
         if not self.hit_mine and not self.game_won():
             self.ticks += 1
+
 
     def display_frame(self):
         self.screen.fill(BLACK)
@@ -268,40 +286,41 @@ class Game(object):
         points_rect.bottomright = self.total_screen_size
         self.screen.blit(points_text, points_rect)
 
-        mines_text = T_FONT.render(
+        mine_count_text = T_FONT.render(
             str(self.mine_amt - count_flags(self.visible_grid)), True, RED)
-        mines_rect = mines_text.get_rect()
-        mines_rect.right = points_rect.left - 10
-        mines_rect.bottom = points_rect.bottom
-        self.screen.blit(mines_text, mines_rect)
+        mine_count_rect = mine_count_text.get_rect()
+        mine_count_rect.right = points_rect.left - 10
+        mine_count_rect.bottom = points_rect.bottom
+        self.screen.blit(mine_count_text, mine_count_rect)
 
 
         if self.hit_mine or self.game_won():
             draw_grid(self.grid, self.screen)
 
-            font = pygame.font.Font(None, T_SIZE*2)
             if self.hit_mine:
-                end_game_text = font.render('Game over!', True, L_BLUE, BLACK) 
+                end_game_text = T2_FONT.render('Game over!', True, 
+                                               L_BLUE, BLACK) 
             else:
-                end_game_text = font.render('You won!', True, L_BLUE, BLACK)
+                end_game_text = T2_FONT.render('You won!', True, L_BLUE, BLACK)
             end_game_rect = end_game_text.get_rect()
             end_game_rect.center = self.center
             self.screen.blit(end_game_text, end_game_rect)
 
-            continue_text = T_FONT.render('Hit space to play again', True, 
-                L_BLUE, BLACK)
+            continue_text = T_FONT.render('Hit space to play again', 
+                                          True, L_BLUE, BLACK)
             continue_rect = continue_text.get_rect()
             continue_rect.center = (self.center[0], self.center[1] + T_SIZE)
             self.screen.blit(continue_text, continue_rect)
 
-            difficulty_text = T_FONT.render('Or select a difficulty', True,
-                L_BLUE, BLACK)
+            difficulty_text = T_FONT.render('Or select a difficulty', 
+                                            True, L_BLUE, BLACK)
             difficulty_rect = difficulty_text.get_rect()
             difficulty_rect.center = (self.center[0], 
-                                        self.center[1] + 1.6*T_SIZE)
+                                      self.center[1] + 1.6*T_SIZE)
             self.screen.blit(difficulty_text, difficulty_rect)
 
         pygame.display.flip()
+
 
 EASY = Game((8, 8), 10)
 screen = pygame.display.set_mode(EASY.total_screen_size)
@@ -309,11 +328,12 @@ pygame.display.set_caption("YoursSweeper")
 flag_img = pygame.image.load('flag.png').convert_alpha()
 mine_img = pygame.image.load('mine.png').convert_alpha()
 
+
 def main():
     pygame.init()
     done = False
     clock = pygame.time.Clock()
-    game = opening_screen()
+    game = opening_screen(screen)
     
     while game and not done:
         done = game.process_events()

@@ -4,6 +4,7 @@ from pygame.locals import *
 import random
 import itertools as it
 import numpy as np
+import webbrowser
 
 
 BLACK    = (   0,   0,   0)
@@ -30,8 +31,11 @@ def opening_click_button(mouse_pos):
         elif 184 <= mouse_pos[1] < 212:
             return Game((16, 16), 40)
         elif 212 <= mouse_pos[1] <= 240:
-            return Game((16, 31), 1)
+            return Game((16, 31), 99)
     
+    if mouse_pos[1] > 250:
+        webbrowser.open_new_tab('http://en.wikipedia.org/wiki/'
+                                'Minesweeper_(game)#Overview)')
     return False
 
 
@@ -80,7 +84,7 @@ def init_grid(grid_size, mine_count):
         grid[mine_loc//grid_size[1]][mine_loc%grid_size[1]] = -1
     
     # Set all non-mine cell's value to the number of adjacent mines
-    for r, c in it.product(range(grid_size[0]), range(grid_size[1])):
+    for r, c in np.ndindex(*grid_size):
         if grid[r][c] != -1:
             grid[r][c] = count_adjacent_mines(grid, r, c)
 
@@ -272,7 +276,8 @@ class Game(object):
 
                     # Set/unset flag
                     if row < self.grid_size[0] and col < self.grid_size[1]:
-                        if self.visible_grid[row][col] == -2:
+                        if (self.visible_grid[row][col] == -2 and 
+                            count_flags(self.visible_grid) < self.mine_amt):
                                 self.visible_grid[row][col] = -4
                         elif self.visible_grid[row][col] == -4:
                                 self.visible_grid[row][col] = -2

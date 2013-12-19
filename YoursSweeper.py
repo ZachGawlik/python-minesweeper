@@ -91,17 +91,17 @@ def count_flags(visible_grid):
 def draw_buttons(screen):
     '''Draw the buttons for beg, med, hard difficulties'''
     font = pygame.font.Font(None, T_SIZE)
-    beg_text = font.render('BEG.', True, BLACK, L_GREY)
+    beg_text = font.render('BEG.', True, WHITE, (175, 175, 175))
     beg_rect = beg_text.get_rect()
     beg_rect.midleft = (0, screen.get_height() - T_SIZE/2)
     screen.blit(beg_text, beg_rect)
 
-    med_text = font.render('MED.', True, BLACK, L_GREY)
+    med_text = font.render('MED.', True, WHITE, (150, 150, 150))
     med_rect = med_text.get_rect()
     med_rect.midleft = (75, screen.get_height() - T_SIZE/2)
     screen.blit(med_text, med_rect)
 
-    hard_text = font.render('HARD', True, BLACK, L_GREY)
+    hard_text = font.render('HARD', True, WHITE, GREY)
     hard_rect = hard_text.get_rect()
     hard_rect.midleft = (150, screen.get_height() - T_SIZE/2)
     screen.blit(hard_text, hard_rect)
@@ -291,6 +291,13 @@ class Game(object):
             continue_rect = continue_text.get_rect()
             continue_rect.center = (self.center[0], self.center[1] + T_SIZE)
             self.screen.blit(continue_text, continue_rect)
+
+            difficulty_text = font.render('Or select a difficulty', True,
+                L_BLUE, BLACK)
+            difficulty_rect = difficulty_text.get_rect()
+            difficulty_rect.center = (self.center[0], 
+                                        self.center[1] + 1.6*T_SIZE)
+            self.screen.blit(difficulty_text, difficulty_rect)
 
         pygame.display.flip()
 

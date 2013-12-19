@@ -25,11 +25,11 @@ T2_FONT = pygame.font.Font(None, T_SIZE*2)
 def opening_click_button(mouse_pos):
     '''Handle clicks during opening screen'''
     if 80 <= mouse_pos[0] <= 200:
-        if 178 <= mouse_pos[1] < 210:
+        if 155 <= mouse_pos[1] < 184:
             return EASY
-        elif 210 <= mouse_pos[1] < 244:
+        elif 184 <= mouse_pos[1] < 212:
             return Game((16, 16), 40)
-        elif 244 <= mouse_pos[1] <= 276:
+        elif 212 <= mouse_pos[1] <= 240:
             return Game((16, 31), 99)
     
     return False
@@ -112,14 +112,14 @@ def draw_buttons(screen):
     beg_rect.midleft = (0, screen.get_height() - T_SIZE/2)
     screen.blit(beg_text, beg_rect)
 
-    med_text = T_FONT.render('MED.', True, WHITE, (150, 150, 150))
+    med_text = T_FONT.render('MED ', True, WHITE, (150, 150, 150))
     med_rect = med_text.get_rect()
-    med_rect.midleft = (75, screen.get_height() - T_SIZE/2)
+    med_rect.midleft = (60, screen.get_height() - T_SIZE/2)
     screen.blit(med_text, med_rect)
 
     hard_text = T_FONT.render('HARD', True, WHITE, GREY)
     hard_rect = hard_text.get_rect()
-    hard_rect.midleft = (150, screen.get_height() - T_SIZE/2)
+    hard_rect.midleft = (120, screen.get_height() - T_SIZE/2)
     screen.blit(hard_text, hard_rect)
 
 
@@ -193,6 +193,7 @@ class Game(object):
         self.grid = init_grid(self.grid_size, self.mine_amt)
         self.visible_grid = init_visible_grid(self.grid_size)
 
+        self.clicks = 0
         self.ticks = 0
         self.hit_mine = False
         self.done = False
@@ -220,7 +221,7 @@ class Game(object):
     def reveal_square(self, row, col):
         '''Uncover value of cell. If the cell has 0 adjacent mines, uncover
            the values of all adjacent cells'''
-        if not (row < self.grid_size[0] and col < self.grid_size[1]): 
+        if not (row < self.grid_size[0] and col < self.grid_size[1]):
             return False
 
         if self.grid[row][col] == 0:
@@ -232,16 +233,20 @@ class Game(object):
         else:
             if self.visible_grid[row][col] == -4: return False
 
-            self.visible_grid[row][col] = self.grid[row][col]
-            return self.visible_grid[row][col] == -1
+            if self.clicks == 0 and self.grid[row][col] == -1:
+                self.reset(self.grid_size, self.mine_amt)
+                self.reveal_square(row, col)
+            elif self.visible_grid[row][col] == -2:
+                self.visible_grid[row][col] = self.grid[row][col]
+                return self.visible_grid[row][col] == -1
 
     def click_button(self, mouse_pos):
         if mouse_pos[1] >= self.grid_screen_size[0]: #change so it's [1]?
             if 0 <= mouse_pos[0] <= 50:
                 self.reset((8, 8), 10)
-            elif 75 <= mouse_pos[0] <= 125:
+            elif 60 <= mouse_pos[0] <= 110:
                 self.reset((16, 16), 40)
-            elif 150 <= mouse_pos[0] <= 200:
+            elif 120 <= mouse_pos[0] <= 170:
                 self.reset((16, 31), 99)
 
 
@@ -258,7 +263,9 @@ class Game(object):
             else: 
                 if event.type == MOUSEBUTTONDOWN:
                     pos = pygame.mouse.get_pos()
-                    self.hit_mine = self.reveal_square(*get_grid_coords(*pos))
+                    if pos[1] <= self.grid_screen_size:
+                        self.hit_mine = self.reveal_square(*get_grid_coords(*pos))
+                        self.clicks += 1
                 elif event.type == KEYDOWN and event.key == K_SPACE:
                     pos = pygame.mouse.get_pos()
                     row, col = get_grid_coords(*pos)
@@ -281,7 +288,8 @@ class Game(object):
         draw_buttons(self.screen)
         draw_grid(self.visible_grid, self.screen)
 
-        points_text = T_FONT.render(str(self.ticks//10), True, L_BLUE)
+        points_text = T_FONT.render(str(self.clicks), True, WHITE)
+        #points_text = T_FONT.render(str(self.ticks//10), True, L_BLUE)
         points_rect = points_text.get_rect()
         points_rect.bottomright = self.total_screen_size
         self.screen.blit(points_text, points_rect)
@@ -295,13 +303,13 @@ class Game(object):
 
 
         if self.hit_mine or self.game_won():
-            draw_grid(self.grid, self.screen)
-
             if self.hit_mine:
-                end_game_text = T2_FONT.render('Game over!', True, 
+                draw_grid(self.grid, self.screen)
+                end_game_text = T2_FONT.render('You lost!', True, 
                                                L_BLUE, BLACK) 
             else:
                 end_game_text = T2_FONT.render('You won!', True, L_BLUE, BLACK)
+
             end_game_rect = end_game_text.get_rect()
             end_game_rect.center = self.center
             self.screen.blit(end_game_text, end_game_rect)

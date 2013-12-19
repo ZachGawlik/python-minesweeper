@@ -30,7 +30,7 @@ def opening_click_button(mouse_pos):
         elif 184 <= mouse_pos[1] < 212:
             return Game((16, 16), 40)
         elif 212 <= mouse_pos[1] <= 240:
-            return Game((16, 31), 99)
+            return Game((16, 31), 1)
     
     return False
 
@@ -177,6 +177,7 @@ class Game(object):
         self.reset(grid_size, mine_amt)
 
     def reset(self, grid_size, mine_amt):
+        # Change ordering?
         self.grid_screen_size = (
             T_SIZE*grid_size[0] + MARGIN*(grid_size[0]+1),
             T_SIZE*grid_size[1] + MARGIN*(grid_size[1]+1)
@@ -185,7 +186,6 @@ class Game(object):
                        self.grid_screen_size[0]//2)
         self.total_screen_size = (self.grid_screen_size[1], 
                                   self.grid_screen_size[0] + T_SIZE)
-
         self.screen = pygame.display.set_mode(self.total_screen_size)
 
         self.grid_size = grid_size
@@ -263,7 +263,7 @@ class Game(object):
             else: 
                 if event.type == MOUSEBUTTONDOWN:
                     pos = pygame.mouse.get_pos()
-                    if pos[1] <= self.grid_screen_size:
+                    if pos[1] <= self.grid_screen_size[0]:
                         self.hit_mine = self.reveal_square(*get_grid_coords(*pos))
                         self.clicks += 1
                 elif event.type == KEYDOWN and event.key == K_SPACE:
@@ -285,11 +285,10 @@ class Game(object):
 
     def display_frame(self):
         self.screen.fill(BLACK)
-        draw_buttons(self.screen)
         draw_grid(self.visible_grid, self.screen)
 
-        points_text = T_FONT.render(str(self.clicks), True, WHITE)
-        #points_text = T_FONT.render(str(self.ticks//10), True, L_BLUE)
+        #clicks_text = T_FONT.render(str(self.clicks), True, WHITE)
+        points_text = T_FONT.render(str(self.ticks//10), True, L_BLUE)
         points_rect = points_text.get_rect()
         points_rect.bottomright = self.total_screen_size
         self.screen.blit(points_text, points_rect)
@@ -305,27 +304,20 @@ class Game(object):
         if self.hit_mine or self.game_won():
             if self.hit_mine:
                 draw_grid(self.grid, self.screen)
-                end_game_text = T2_FONT.render('You lost!', True, 
-                                               L_BLUE, BLACK) 
+                first_ln_img = pygame.image.load('lost.png').convert_alpha()
             else:
-                end_game_text = T2_FONT.render('You won!', True, L_BLUE, BLACK)
+                first_ln_img = pygame.image.load('won.png').convert_alpha()
 
-            end_game_rect = end_game_text.get_rect()
-            end_game_rect.center = self.center
-            self.screen.blit(end_game_text, end_game_rect)
+            first_ln_rect = first_ln_img.get_rect()
+            first_ln_rect.center = self.center
+            first_ln_rect.centery -= 25
+            self.screen.blit(first_ln_img, first_ln_rect)
 
-            continue_text = T_FONT.render('Hit space to play again', 
-                                          True, L_BLUE, BLACK)
-            continue_rect = continue_text.get_rect()
-            continue_rect.center = (self.center[0], self.center[1] + T_SIZE)
-            self.screen.blit(continue_text, continue_rect)
-
-            difficulty_text = T_FONT.render('Or select a difficulty', 
-                                            True, L_BLUE, BLACK)
-            difficulty_rect = difficulty_text.get_rect()
-            difficulty_rect.center = (self.center[0], 
-                                      self.center[1] + 1.6*T_SIZE)
-            self.screen.blit(difficulty_text, difficulty_rect)
+            end_text_img = pygame.image.load('endtext.png').convert_alpha()
+            end_text_rect = end_text_img.get_rect()
+            end_text_rect.center = self.center[0], self.center[1]+25
+            self.screen.blit(end_text_img, end_text_rect)
+            draw_buttons(screen)
 
         pygame.display.flip()
 

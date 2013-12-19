@@ -45,21 +45,6 @@ def opening_screen():
                 if opening_click_button(mouse_pos):
                     return opening_click_button(mouse_pos)
 
-
-#
-##
-#
-#
-#
-#
-#
-#TODO: FIX THE TWO FUNCTIONS AND ANYTHING ELSE ON GRIDSIZE
-#
-#
-#
-#
-#
-#
 def init_visible_grid(grid_size):
     '''Initialize grid representing matrix visible to player'''
     visible_grid = []
@@ -128,7 +113,8 @@ def draw_grid(visible_grid, screen, flag_img, mine_img):
        -4: a flag placed by the player on an unclicked tile
         0: a clicked tile with no adjacent mines'''
     font = pygame.font.Font(None, T_SIZE)
-    for r, c in it.product(range(len(visible_grid)), range(len(visible_grid[0]))):
+    for r, c in it.product(range(len(visible_grid)), 
+                            range(len(visible_grid[0]))):
         color_dict = {-2: L_GREY, -1: RED, 0: GREY, -4: L_GREY}
         color = color_dict.get(visible_grid[r][c], WHITE)
 

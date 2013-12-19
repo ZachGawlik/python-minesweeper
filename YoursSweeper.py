@@ -22,11 +22,11 @@ def opening_click_button(mouse_pos):
     '''Handle clicks during opening screen'''
     if 80 <= mouse_pos[0] <= 200:
         if 178 <= mouse_pos[1] < 210:
-            return Game(8, 10)
+            return Game((8, 8), 10)
         elif 210 <= mouse_pos[1] < 244:
-            return Game(16, 40)
+            return Game((16, 16), 40)
         elif 244 <= mouse_pos[1] <= 276:
-            return Game(21, 99)
+            return Game((16, 31), 99)
     
     return False
 
@@ -45,11 +45,26 @@ def opening_screen():
                 if opening_click_button(mouse_pos):
                     return opening_click_button(mouse_pos)
 
-def init_visible_grid(grid_size=10):
+
+#
+##
+#
+#
+#
+#
+#
+#TODO: FIX THE TWO FUNCTIONS AND ANYTHING ELSE ON GRIDSIZE
+#
+#
+#
+#
+#
+#
+def init_visible_grid(grid_size):
     '''Initialize grid representing matrix visible to player'''
     visible_grid = []
-    for row in range(grid_size):
-        visible_grid.append([-2 for i in range(grid_size)])
+    for row in range(grid_size[0]):
+        visible_grid.append([-2 for c in range(grid_size[1])])
     return visible_grid
 
 def init_grid(grid_size, mine_count):
@@ -57,16 +72,16 @@ def init_grid(grid_size, mine_count):
        -1: represents a mine
        0-8: represents number of miens adjacent to this cell'''
     grid = []
-    for row in range(grid_size):
-        grid.append([0 for i in range(grid_size)])
+    for row in range(grid_size[0]):
+        grid.append([0 for c in range(grid_size[1])])
     
     # Place mines randomly
-    mine_locs = random.sample(xrange(pow(grid_size, 2)), mine_count)
+    mine_locs = random.sample(xrange(grid_size[0]*grid_size[1]), mine_count)
     for mine_loc in mine_locs:
-        grid[mine_loc//grid_size][mine_loc%grid_size] = -1
+        grid[mine_loc//grid_size[1]][mine_loc%grid_size[1]] = -1
     
     # Set all non-mine cell's value to the number of adjacent mines
-    for r, c in it.product(range(grid_size), repeat=2):
+    for r, c in it.product(range(grid_size[0]), range(grid_size[1])):
         if grid[r][c] != -1:
             grid[r][c] = count_surrounding_mines(grid, r, c)
 
@@ -113,7 +128,7 @@ def draw_grid(visible_grid, screen, flag_img, mine_img):
        -4: a flag placed by the player on an unclicked tile
         0: a clicked tile with no adjacent mines'''
     font = pygame.font.Font(None, T_SIZE)
-    for r, c in it.product(range(len(visible_grid)), repeat=2):
+    for r, c in it.product(range(len(visible_grid)), range(len(visible_grid[0]))):
         color_dict = {-2: L_GREY, -1: RED, 0: GREY, -4: L_GREY}
         color = color_dict.get(visible_grid[r][c], WHITE)
 
@@ -151,16 +166,16 @@ def get_center_xy_coords(row, col):
 
 
 class Game(object):
-    def __init__(self, grid_size=10, mine_amt=10):
+    def __init__(self, grid_size, mine_amt):
         self.reset(grid_size, mine_amt)
 
     def reset(self, grid_size, mine_amt):
-        self.grid_screen_size = (T_SIZE*grid_size + MARGIN*(grid_size+1),
-                T_SIZE*grid_size + MARGIN*(grid_size+1))
-        self.center = (self.grid_screen_size[0]//2, 
-                        self.grid_screen_size[1]//2)
-        self.total_screen_size = (self.grid_screen_size[0], 
-            self.grid_screen_size[1] + T_SIZE)
+        self.grid_screen_size = (T_SIZE*grid_size[0] + MARGIN*(grid_size[0]+1),
+                T_SIZE*grid_size[1] + MARGIN*(grid_size[1]+1))
+        self.center = (self.grid_screen_size[1]//2, 
+                        self.grid_screen_size[0]//2)
+        self.total_screen_size = (self.grid_screen_size[1], 
+            self.grid_screen_size[0] + T_SIZE)
 
         self.screen = pygame.display.set_mode(self.total_screen_size)
 
@@ -180,15 +195,18 @@ class Game(object):
 
     def all_clicked(self):
         uncovered_tiles = 0
-        for r, c in it.product(range(self.grid_size), repeat=2):
+        for r, c in it.product(range(self.grid_size[0]), 
+                                range(self.grid_size[1])):
             if self.visible_grid[r][c] >= 0:
                 uncovered_tiles += 1
 
-        return pow(self.grid_size, 2) - uncovered_tiles == self.mine_amt
+        return (self.grid_size[0]*self.grid_size[1] - 
+                    uncovered_tiles == self.mine_amt)
 
     def all_mines_flagged(self):
         '''Check for win by flagging all mines correctly and no other tiles'''
-        for r, c in it.product(range(self.grid_size), repeat=2):
+        for r, c in it.product(range(self.grid_size[0]), 
+                                range(self.grid_size[1])):
             if (self.grid[r][c] == -1 and self.visible_grid[r][c] != -4 or
                 self.visible_grid[r][c] == -4 and self.grid[r][c] != -1):
                 return False
@@ -201,13 +219,14 @@ class Game(object):
     def reveal_square(self, row, col):
         '''Uncover value of cell. If the cell has 0 adjacent mines, uncover
            the values of all adjacent cells'''
-        if not (col < self.grid_size and row < self.grid_size): return False
+        if not (row < self.grid_size[0] and col < self.grid_size[1]): 
+            return False
 
         if self.grid[row][col] == 0:
             self.visible_grid[row][col] = 0
             for r, c in it.product(range(row-1, row+2), range(col-1, col+2)):
-                if (0 <= r < self.grid_size and 0 <= c < self.grid_size and
-                    self.visible_grid[r][c] <= -2):
+                if (0 <= r < self.grid_size[0] and 0 <= c < self.grid_size[1]
+                    and self.visible_grid[r][c] <= -2):
                     self.reveal_square(r, c)
         else:
             if self.visible_grid[row][col] == -4: return False
@@ -216,13 +235,13 @@ class Game(object):
             return self.visible_grid[row][col] == -1
 
     def click_button(self, mouse_pos):
-        if mouse_pos[1] >= self.grid_screen_size[1]:
+        if mouse_pos[1] >= self.grid_screen_size[0]: #change so it's [1]?
             if 0 <= mouse_pos[0] <= 50:
-                self.reset(8, 10)
+                self.reset((8, 8), 10)
             elif 75 <= mouse_pos[0] <= 125:
-                self.reset(16, 40)
+                self.reset((16, 16), 40)
             elif 150 <= mouse_pos[0] <= 200:
-                self.reset(21, 99)
+                self.reset((16, 31), 99)
 
 
     def process_events(self):
@@ -244,7 +263,7 @@ class Game(object):
                     row, col = get_grid_coords(*pos)
 
                     # Set/unset flag
-                    if col < self.grid_size and row < self.grid_size:
+                    if row < self.grid_size[0] and col < self.grid_size[1]:
                         if self.visible_grid[row][col] == -2:
                                 self.visible_grid[row][col] = -4
                         elif self.visible_grid[row][col] == -4:

@@ -1,8 +1,7 @@
-'''Basic Minesweeper clone'''
+'''YoursSweeper, a basic Minesweeper clone'''
 import pygame
 from pygame.locals import *
 import random
-import itertools as it
 import numpy as np
 import webbrowser
 
@@ -10,7 +9,6 @@ import webbrowser
 BLACK    = (   0,   0,   0)
 WHITE    = ( 255, 255, 255)
 RED      = ( 255,   0,   0)
-GREEN    = (   0, 255,   0)
 GREY     = ( 100, 100, 100)
 L_GREY   = ( 200, 200, 200)
 L_BLUE   = ( 150, 150, 250)
@@ -91,22 +89,21 @@ def init_grid(grid_size, mine_count):
     return grid
 
 
+def all_adjacents(grid, row, col):
+    '''Generate all indices adjacent to given index. Includes given index'''
+    for r, c in np.ndindex(3, 3):
+        if 0 <= row-1+r < len(grid) and 0 <= col-1+c < len(grid[0]):
+            yield row-1+r, col-1+c
+
+
 def count_adjacent_mines(grid, row, col):
-    count = 0
-    for r in range(row-1, row+2):
-        for c in range(col-1, col+2):
-            if 0 <= r < len(grid) and 0 <= c < len(grid[0]):
-                count = count + 1 if grid[r][c] == -1 else count
-    return count
+    return (
+        sum((1 for r, c in all_adjacents(grid, row, col) if grid[r][c] == -1)))
 
 
-def count_flags(visible_grid):
+def count_flags(grid):
     '''Count flags placed by user. Use for player's remaining mine count'''
-    total_flags = 0
-    for r, c in grid_ndindex(visible_grid):
-        if visible_grid[r][c] == -4:
-            total_flags += 1
-    return total_flags
+    return sum((1 for r, c in grid_ndindex(grid) if grid[r][c] == -4))
 
 
 def draw_buttons(screen):
@@ -181,7 +178,6 @@ class Game(object):
         self.reset(grid_size, mine_amt)
 
     def reset(self, grid_size, mine_amt):
-        # Change ordering?
         self.grid_screen_size = (
             T_SIZE*grid_size[0] + MARGIN*(grid_size[0]+1),
             T_SIZE*grid_size[1] + MARGIN*(grid_size[1]+1)
@@ -230,9 +226,8 @@ class Game(object):
 
         if self.grid[row][col] == 0:
             self.visible_grid[row][col] = 0
-            for r, c in it.product(range(row-1, row+2), range(col-1, col+2)):
-                if (0 <= r < self.grid_size[0] and 0 <= c < self.grid_size[1]
-                    and self.visible_grid[r][c] <= -2):
+            for r, c in all_adjacents(self.grid, row, col):
+                if self.visible_grid[r][c] <= -2:
                     self.reveal_square(r, c)
         else:
             if self.visible_grid[row][col] == -4: return False
@@ -245,14 +240,13 @@ class Game(object):
                 return self.visible_grid[row][col] == -1
 
     def click_button(self, mouse_pos):
-        if mouse_pos[1] >= self.grid_screen_size[0]: #change so it's [1]?
+        if mouse_pos[1] >= self.grid_screen_size[0]:
             if 0 <= mouse_pos[0] <= 50:
                 self.reset((8, 8), 10)
             elif 60 <= mouse_pos[0] <= 110:
                 self.reset((16, 16), 40)
             elif 120 <= mouse_pos[0] <= 170:
                 self.reset((16, 31), 99)
-
 
     def process_events(self):
         for event in pygame.event.get():
@@ -268,7 +262,8 @@ class Game(object):
                 if event.type == MOUSEBUTTONDOWN:
                     pos = pygame.mouse.get_pos()
                     if pos[1] <= self.grid_screen_size[0]:
-                        self.hit_mine = self.reveal_square(*get_grid_coords(*pos))
+                        self.hit_mine = self.reveal_square(
+                                *get_grid_coords(*pos))
                         self.clicks += 1
                 elif event.type == KEYDOWN and event.key == K_SPACE:
                     pos = pygame.mouse.get_pos()
@@ -282,17 +277,14 @@ class Game(object):
                         elif self.visible_grid[row][col] == -4:
                                 self.visible_grid[row][col] = -2
 
-
     def run_logic(self):
         if not self.hit_mine and not self.game_won():
             self.ticks += 1
-
 
     def display_frame(self):
         self.screen.fill(BLACK)
         draw_grid(self.visible_grid, self.screen)
 
-        #clicks_text = T_FONT.render(str(self.clicks), True, WHITE)
         points_text = T_FONT.render(str(self.ticks//10), True, L_BLUE)
         points_rect = points_text.get_rect()
         points_rect.bottomright = self.total_screen_size

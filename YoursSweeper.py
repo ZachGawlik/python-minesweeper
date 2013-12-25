@@ -5,6 +5,7 @@ from pygame.locals import *
 import random
 import numpy as np
 import webbrowser
+import os.path
 
 
 BLACK  = (   0,   0,   0)
@@ -14,8 +15,8 @@ GREY   = ( 100, 100, 100)
 L_GREY = ( 200, 200, 200)
 L_BLUE = ( 150, 150, 250)
 
-T_SIZE = 25
 MARGIN = 5 # Margin between each tile
+T_SIZE = 25
 
 pygame.font.init()
 T_FONT = pygame.font.Font(None, T_SIZE)
@@ -24,6 +25,19 @@ T2_FONT = pygame.font.Font(None, T_SIZE*2)
 EASY = ((8, 8), 10)
 MEDIUM = ((16, 16), 40)
 HARD = ((16, 31), 99)
+
+def create_base_file():
+    print('attempting to do this')
+    highscore_file = open('highscore.txt', 'w')
+    highscore_file.writelines([
+        'Easy \n'
+        'N/A: 999 \n'
+        'Medium \n'
+        'N/A: 999 \n'
+        'Hard \n'
+        'N/A: 999 \n'
+         ])
+    highscore_file.close()
 
 
 def opening_click_button(mouse_pos):
@@ -52,9 +66,9 @@ def opening_screen(screen):
 
     while True:
         for event in pygame.event.get():
-            if event.type == pygame.QUIT:
+            if event.type == QUIT:
                 return False # Flag to close the window
-            if event.type == pygame.MOUSEBUTTONDOWN:
+            if event.type == MOUSEBUTTONDOWN:
                 mouse_pos = pygame.mouse.get_pos()
                 if opening_click_button(mouse_pos):
                     return opening_click_button(mouse_pos)
@@ -94,7 +108,7 @@ def init_grid(grid_size, mine_count):
     '''Initialize mine grid: reset board and place new mines randomly.
 
     -1: represents a mine
-    0-8: represents number of miens adjacent to this cell
+    0-8: represents number of mines adjacent to this cell
 
     '''
     grid = []
@@ -192,8 +206,14 @@ def get_center_xy_coords(row, col):
 
 class Game(object):
     def __init__(self, grid_size, mine_amt):
-        self.reset(grid_size, mine_amt)
+        if (not os.path.exists('highscore.txt') or 
+            (os.path.getsize('highscore.txt') == 0)):
+            create_base_file()
+        with open('highscore.txt') as f:
+            self.scoredata = f.readlines()
 
+        self.reset(grid_size, mine_amt)
+        
     def reset(self, grid_size, mine_amt):
         self.grid_screen_size = (
             T_SIZE*grid_size[0] + MARGIN*(grid_size[0]+1),
@@ -213,6 +233,7 @@ class Game(object):
         self.clicks = 0
         self.ticks = 0
         self.hit_mine = False
+        self.won = False
         self.done = False
 
     def all_clicked(self):
@@ -232,11 +253,21 @@ class Game(object):
 
         return count_flags(self.visible_grid) == self.mine_amt
 
-    def game_won(self):
-        '''Determine if current game has been won.'''
-        return self.all_clicked() or self.all_mines_flagged()
+    def flag_cell(self, row, col):
+        '''Set/unset flag for the given cell.'''
+        if row <self.grid_size[0] and col <self.grid_size[1]:
+            if row < self.grid_size[0] and col < self.grid_size[1]:
+                if (self.visible_grid[row][col] == -2 and 
+                    count_flags(self.visible_grid) < self.mine_amt):
+                        self.visible_grid[row][col] = -4
+                elif self.visible_grid[row][col] == -4:
+                        self.visible_grid[row][col] = -2
 
-    def reveal_square(self, row, col):
+    def check_won(self):
+        '''Determine if current game has been won.'''
+        self.won = self.all_clicked() or self.all_mines_flagged()
+
+    def reveal_square(self, row, col, overwrite_flags=False):
         '''Uncover value of cell. 
 
         If the cell has no adjacent mines, uncover all adjacent cells.
@@ -250,59 +281,77 @@ class Game(object):
             self.visible_grid[row][col] = 0
             for r, c in adjacents(self.grid, row, col):
                 if self.visible_grid[r][c] <= -2:
-                    self.reveal_square(r, c)
+                    self.reveal_square(r, c, True)
         else:
-            if self.visible_grid[row][col] == -4: return False
+            if self.visible_grid[row][col] == -4 and not overwrite_flags:
+                return False
 
             if self.clicks == 0 and cell_value == -1: #Prevent first click loss
                 self.reset(self.grid_size, self.mine_amt)
                 self.reveal_square(row, col)
-            elif self.visible_grid[row][col] == -2:
+                return False
+            else: # self.visible_grid[row][col] is equal to -2
                 self.visible_grid[row][col] = cell_value
-                return self.visible_grid[row][col] == -1
+                return cell_value == -1
 
     def click_button(self, mouse_pos):
         '''Handle clicks during game over screen.'''
         if mouse_pos[1] >= self.grid_screen_size[0]:
             if 0 <= mouse_pos[0] <= 50:
-                self.reset((8, 8), 10)
+                self.reset(*EASY)
             elif 60 <= mouse_pos[0] <= 110:
-                self.reset((16, 16), 40)
+                self.reset(*MEDIUM)
             elif 120 <= mouse_pos[0] <= 170:
-                self.reset((16, 31), 99)
+                self.reset(*HARD)
 
     def process_events(self):
         for event in pygame.event.get():
             if event.type == QUIT:
                 return True
-            if self.hit_mine or self.game_won():
+            if self.hit_mine or self.won:
                 if event.type == KEYDOWN and event.key == K_SPACE:
                     self.reset(self.grid_size, self.mine_amt)
                 if event.type == MOUSEBUTTONDOWN:
                     pos = pygame.mouse.get_pos()
                     self.click_button(pos)
+                    
             else: 
                 if event.type == MOUSEBUTTONDOWN:
                     pos = pygame.mouse.get_pos()
-                    if pos[1] <= self.grid_screen_size[0]:
-                        self.hit_mine = self.reveal_square(
-                                *get_grid_coords(*pos))
-                        self.clicks += 1
+                    self.hit_mine = self.reveal_square(*get_grid_coords(*pos))
+                    self.clicks += 1
                 elif event.type == KEYDOWN and event.key == K_SPACE:
                     pos = pygame.mouse.get_pos()
-                    row, col = get_grid_coords(*pos)
+                    self.flag_cell(*get_grid_coords(*pos))
 
-                    # Set/unset flag
-                    if row < self.grid_size[0] and col < self.grid_size[1]:
-                        if (self.visible_grid[row][col] == -2 and 
-                            count_flags(self.visible_grid) < self.mine_amt):
-                                self.visible_grid[row][col] = -4
-                        elif self.visible_grid[row][col] == -4:
-                                self.visible_grid[row][col] = -2
+    def getline(self):
+        '''Return which line # of highscore file to overwrite for this mode.'''
+        mode_to_line = {EASY[0]: 1, MEDIUM[0]: 3, HARD[0]: 5}
+        return mode_to_line.get(self.grid_size)
+
+    def new_highscore(self):
+        name = raw_input('New high score! What is your name?  ')
+        self.scoredata[self.getline()] = '{0}: {1}\n'.format(name, self.ticks)
+        print(self.scoredata)
+
+        with open('highscore.txt', 'w') as f:
+            f.writelines(self.scoredata)
+
+    def is_highscore(self):
+        '''Determine if completed game set a new highscore.'''
+        current_line = self.scoredata[self.getline()].strip()
+        current_highscore = current_line.split(': ')[-1]
+        return self.ticks < int(current_highscore) and self.won
 
     def run_logic(self):
-        if not self.hit_mine and not self.game_won():
+        self.check_won()
+        if not self.hit_mine and not self.won:
             self.ticks += 1
+
+        if self.won and self.is_highscore():
+            self.display_frame()
+            print(self.hit_mine)
+            self.new_highscore()
 
     def display_frame(self):
         self.screen.fill(BLACK)
@@ -322,22 +371,27 @@ class Game(object):
         self.screen.blit(mine_count_text, mine_count_rect)
 
 
-        if self.hit_mine or self.game_won():
+        if self.hit_mine or self.won:
             if self.hit_mine:
                 draw_grid(self.grid, self.screen)
-                first_ln_img = pygame.image.load('lost.png').convert_alpha()
+                first_ln = pygame.image.load('lost.png').convert_alpha()
+            elif self.is_highscore():
+                first_ln = pygame.image.load('newhs.png').convert_alpha()
             else:
-                first_ln_img = pygame.image.load('won.png').convert_alpha()
+                first_ln = pygame.image.load('won.png').convert_alpha()
 
-            first_ln_rect = first_ln_img.get_rect()
-            first_ln_rect.center = self.center
-            first_ln_rect.centery -= 25
-            self.screen.blit(first_ln_img, first_ln_rect)
+            first_ln_rect = first_ln.get_rect()
+            first_ln_rect.midbottom = self.center
+            self.screen.blit(first_ln, first_ln_rect)
 
-            end_text_img = pygame.image.load('endtext.png').convert_alpha()
-            end_text_rect = end_text_img.get_rect()
-            end_text_rect.center = self.center[0], self.center[1]+25
-            self.screen.blit(end_text_img, end_text_rect)
+            if self.is_highscore():
+                end_text = pygame.image.load('hsinstruct.png').convert_alpha()
+            else:
+                end_text = pygame.image.load('endtext.png').convert_alpha()
+                
+            end_text_rect = end_text.get_rect()
+            end_text_rect.midtop = self.center
+            self.screen.blit(end_text, end_text_rect)
             draw_buttons(screen)
 
         pygame.display.flip()

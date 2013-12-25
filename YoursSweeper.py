@@ -240,10 +240,11 @@ class Game(object):
         '''Return if game won by clicking all non-mine tiles.'''
         covered_tiles = 0
         for r, c in grid_ndindex(self.grid):
-            if self.visible_grid[r][c] <= -2:
-                covered_tiles += 1
+            if self.visible_grid[r][c] <= -2: # spot flagged or unclicked
+                if not self.grid[r][c] == -1: # covered spot is not a mine
+                    return False
 
-        return covered_tiles == self.mine_amt
+        return True
 
     def all_mines_flagged(self):
         '''Return if game won by correctly flagging all mines.'''
@@ -286,7 +287,7 @@ class Game(object):
             if self.visible_grid[row][col] == -4 and not overwrite_flags:
                 return False
 
-            if self.clicks == 0 and cell_value == -1: #Prevent first click loss
+            if self.clicks == 0 and cell_value == -1: # Prevent first click loss
                 self.reset(self.grid_size, self.mine_amt)
                 self.reveal_square(row, col)
                 return False
@@ -331,8 +332,10 @@ class Game(object):
 
     def new_highscore(self):
         name = raw_input('New high score! What is your name?  ')
-        self.scoredata[self.getline()] = '{0}: {1}\n'.format(name, self.ticks)
-        print(self.scoredata)
+        new_entry = '{0}: {1}\n'.format(name, self.ticks//10)
+        self.scoredata[self.getline()] = new_entry
+        for line in self.scoredata:
+            print(line.strip())
 
         with open('highscore.txt', 'w') as f:
             f.writelines(self.scoredata)
@@ -341,7 +344,7 @@ class Game(object):
         '''Determine if completed game set a new highscore.'''
         current_line = self.scoredata[self.getline()].strip()
         current_highscore = current_line.split(': ')[-1]
-        return self.ticks < int(current_highscore) and self.won
+        return self.ticks//10 < int(current_highscore) and self.won
 
     def run_logic(self):
         self.check_won()
@@ -350,7 +353,6 @@ class Game(object):
 
         if self.won and self.is_highscore():
             self.display_frame()
-            print(self.hit_mine)
             self.new_highscore()
 
     def display_frame(self):
@@ -358,7 +360,7 @@ class Game(object):
         draw_grid(self.visible_grid, self.screen)
 
         time_text = T_FONT.render(
-                "{0:0>3}".format(self.ticks//10), True, L_BLUE)
+                '{0:0>3}'.format(self.ticks//10), True, L_BLUE)
         time_rect = time_text.get_rect()
         time_rect.bottomright = self.total_screen_size
         self.screen.blit(time_text, time_rect)
@@ -374,11 +376,14 @@ class Game(object):
         if self.hit_mine or self.won:
             if self.hit_mine:
                 draw_grid(self.grid, self.screen)
-                first_ln = pygame.image.load('lost.png').convert_alpha()
+                img_file = 'lost.png'
             elif self.is_highscore():
-                first_ln = pygame.image.load('newhs.png').convert_alpha()
+                img_file = 'newhs.png'
             else:
-                first_ln = pygame.image.load('won.png').convert_alpha()
+                img_file = 'won.png'
+
+            first_ln = pygame.image.load(img_file).convert_alpha()
+
 
             first_ln_rect = first_ln.get_rect()
             first_ln_rect.midbottom = self.center
@@ -399,7 +404,7 @@ class Game(object):
 
 easy_game = Game(*EASY)
 screen = pygame.display.set_mode(easy_game.total_screen_size)
-pygame.display.set_caption("YoursSweeper")
+pygame.display.set_caption('YoursSweeper')
 FLAG_IMG = pygame.image.load('flag.png').convert_alpha()
 MINE_IMG = pygame.image.load('mine.png').convert_alpha()
 
